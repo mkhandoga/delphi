@@ -22,16 +22,71 @@ class PotentiallyWrappedSparseCoder(Protocol):
     cfg: SparseCoderConfig
     num_latents: int
 
+from safetensors import safe_open
+from safetensors.torch import load_file, save_file
+
+def _strip_unexpected_keys_in_dir(dir_path: Path, bad_prefixes=("post_enc",)) -> bool:
+    """
+    Remove parameters whose names start with any of bad_prefixes from all
+    .safetensors files in dir_path. Returns True if anything was changed.
+    """
+    changed = False
+    for f in dir_path.glob("*.safetensors"):
+        # Fast peek at keys without loading tensors to GPU
+        with safe_open(f, framework="pt") as sf:
+            keys = list(sf.keys())
+        drop = [k for k in keys if any(k == p or k.startswith(p + ".") for p in bad_prefixes)]
+        if not drop:
+            continue
+
+        sd = load_file(str(f))  # tensors are still on CPU here
+        keep = {k: v for k, v in sd.items() if k not in drop}
+        backup = f.with_suffix(f.suffix + ".bak")
+        f.rename(backup)
+        save_file(keep, str(f))
+        changed = True
+        print(f"[delphi] Stripped {len(drop)} unexpected keys from {f.name}: {drop[:5]}{' ...' if len(drop) > 5 else ''}")
+    return changed
+
+# def sae_dense_latents(x: Tensor, sae: PotentiallyWrappedSparseCoder) -> Tensor:
+#     """Run `sae` on `x`, yielding the dense activations."""
+#     x_in = x.reshape(-1, x.shape[-1])
+#     encoded = sae.encode(x_in)
+#     buf = torch.zeros(
+#         x_in.shape[0], sae.num_latents, dtype=x_in.dtype, device=x_in.device
+#     )
+#     buf = buf.scatter_(-1, encoded.top_indices, encoded.top_acts.to(buf.dtype))
+#     return buf.reshape(*x.shape[:-1], -1)
 
 def sae_dense_latents(x: Tensor, sae: PotentiallyWrappedSparseCoder) -> Tensor:
-    """Run `sae` on `x`, yielding the dense activations."""
+    """Run `sae` on `x`, yielding dense activations.
+    Cast input to the SAE's parameter dtype/device to avoid dtype mismatches.
+    """
+    # Flatten tokens×positions
     x_in = x.reshape(-1, x.shape[-1])
+
+    # Discover SAE dtype/device
+    try:
+        p = next(sae.parameters())
+        sae_device = p.device
+        sae_dtype = p.dtype
+    except Exception:
+        sae_device = x_in.device
+        sae_dtype = x_in.dtype
+
+    # Move & cast input to match SAE weights (and keep it contiguous for fused kernels)
+    x_in = x_in.to(device=sae_device, dtype=sae_dtype).contiguous()
+
+    # Encode (topk indices + activations)
     encoded = sae.encode(x_in)
+
+    # Build dense output in SAE compute dtype, then return in the original x dtype
     buf = torch.zeros(
-        x_in.shape[0], sae.num_latents, dtype=x_in.dtype, device=x_in.device
+        x_in.shape[0], sae.num_latents, dtype=sae_dtype, device=sae_device
     )
-    buf = buf.scatter_(-1, encoded.top_indices, encoded.top_acts.to(buf.dtype))
-    return buf.reshape(*x.shape[:-1], -1)
+    buf.scatter_(-1, encoded.top_indices, encoded.top_acts.to(buf.dtype))
+
+    return buf.reshape(*x.shape[:-1], -1).to(dtype=x.dtype, device=x.device)
 
 
 def resolve_path(
@@ -67,45 +122,41 @@ def load_sparsify_sparse_coders(
     device: str | torch.device,
     compile: bool = False,
 ) -> dict[str, PotentiallyWrappedSparseCoder]:
-    """
-    Load sparsify sparse coders for specified hookpoints.
-
-    Args:
-        model (Any): The model to load autoencoders for.
-        name (str): The name of the sparse model to load. If the model is on-disk
-            this is the path to the directory containing the sparse model weights.
-        hookpoints (list[str]): list of hookpoints to identify the sparse models.
-        device (str | torch.device | None, optional): The device to load the
-            sparse models on. If not specified the sparse models will be loaded
-            on the same device as the base model.
-
-    Returns:
-        dict[str, Any]: A dictionary mapping hookpoints to sparse models.
-    """
-
-    # Load the sparse models
     sparse_model_dict = {}
     name_path = Path(name)
+
     if name_path.exists():
         for hookpoint in hookpoints:
-            sparse_model_dict[hookpoint] = SparseCoder.load_from_disk(
-                name_path / hookpoint, device=device
-            )
+            hook_dir = name_path / hookpoint
+
+            # NEW: sanitize unexpected keys (e.g., 'post_enc') so strict load won't fail
+            _strip_unexpected_keys_in_dir(hook_dir, bad_prefixes=("post_enc",))
+
+            try:
+                sc = SparseCoder.load_from_disk(hook_dir, device=device)
+            except RuntimeError as e:
+                # Helpful message if something new pops up
+                raise RuntimeError(
+                    f"SparseCoder.load_from_disk failed for {hook_dir}. "
+                    f"If this is an 'Unexpected key(s)...' error, your checkpoint "
+                    f"contains parameters not supported by the current 'sparsify'. "
+                    f"Either re-export without those modules or update 'sparsify'.\n\n{e}"
+                ) from e
+
             if compile:
-                sparse_model_dict[hookpoint] = torch.compile(
-                    sparse_model_dict[hookpoint]
-                )
+                sc = torch.compile(sc)
+            sparse_model_dict[hookpoint] = sc
+
     else:
-        # Load on CPU first to not run out of memory
+        # remote/hub path
         sparse_models = SparseCoder.load_many(name, device="cpu")
         for hookpoint in hookpoints:
-            sparse_model_dict[hookpoint] = sparse_models[hookpoint].to(device)
+            sc = sparse_models[hookpoint].to(device)
             if compile:
-                sparse_model_dict[hookpoint] = torch.compile(
-                    sparse_model_dict[hookpoint]
-                )
-
+                sc = torch.compile(sc)
+            sparse_model_dict[hookpoint] = sc
         del sparse_models
+
     return sparse_model_dict
 
 

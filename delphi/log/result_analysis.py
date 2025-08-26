@@ -7,7 +7,35 @@ import plotly.express as px
 import plotly.graph_objects as go
 import torch
 from sklearn.metrics import roc_auc_score, roc_curve
+import numpy as np
+import torch
 
+def _take_counts_for_module(counts, module: str, latent_idx_series) -> torch.Tensor:
+    """Return firing weights aligned to latent_idx (positional), safe for any counts type."""
+    idx = np.asarray(latent_idx_series, dtype=np.int64)
+
+    c = counts.get(module, None) if isinstance(counts, dict) else None
+    if c is None:
+        # no counts for this module
+        return torch.zeros(len(idx), dtype=torch.float32)
+
+    # Normalize c to a 1-D torch tensor of length num_latents
+    if isinstance(c, torch.Tensor):
+        c_t = c
+    elif hasattr(c, "to_numpy"):         # pandas Series / DataFrame column
+        c_t = torch.from_numpy(c.to_numpy())
+    else:                                # list/np array/etc.
+        c_t = torch.as_tensor(c)
+
+    c_t = c_t.to(torch.float32)
+    idx_t = torch.from_numpy(idx)
+
+    # mask out-of-bounds latent ids (happens with graph-only subsets)
+    mask = (idx_t >= 0) & (idx_t < c_t.numel())
+    out = torch.zeros(len(idx_t), dtype=torch.float32)
+    if mask.any():
+        out[mask] = c_t[idx_t[mask]]
+    return out
 
 def plot_firing_vs_f1(
     latent_df: pd.DataFrame, num_tokens: int, out_dir: Path, run_label: str
@@ -212,43 +240,21 @@ def load_data(scores_path: Path, modules: list[str]):
     return pd.concat(latent_dfs, ignore_index=True), counts
 
 
-def frequency_weighted_f1(
-    df: pd.DataFrame, counts: dict[str, torch.Tensor]
-) -> float | None:
-    rows = []
-    for (module, latent_idx), grp in df.groupby(["module", "latent_idx"]):
-        f1 = compute_classification_metrics(compute_confusion(grp))["f1_score"]
-        fire = counts[module][latent_idx].item()
-        rows.append(
-            {
-                "module": module,
-                "latent_idx": latent_idx,
-                "f1_score": f1,
-                "firing_count": fire,
-            }
-        )
+def frequency_weighted_f1(module_df, counts) -> float | None:
+    module = module_df["module"].iat[0]
 
-    latent_df = pd.DataFrame(rows)
+    if counts is None or (isinstance(counts, dict) and module not in counts):
+        return None
 
-    per_module_f1 = []
-    for module in latent_df["module"].unique():
-        module_df = latent_df[latent_df["module"] == module]
+    firing_weights = _take_counts_for_module(counts, module, module_df["latent_idx"])
 
-        firing_weights = counts[module][module_df["latent_idx"]].float()
-        total_weight = firing_weights.sum()
-        if total_weight == 0:
-            continue
+    # If everything is zero, skip instead of dividing by zero
+    total_w = firing_weights.sum().item()
+    if total_w == 0:
+        return None
 
-        f1_tensor = torch.as_tensor(module_df["f1_score"].values, dtype=torch.float32)
-        module_f1 = (f1_tensor * firing_weights).sum() / firing_weights.sum()
-        per_module_f1.append(module_f1)
-
-    overall_frequency_weighted_f1 = torch.stack(per_module_f1).mean()
-    return (
-        overall_frequency_weighted_f1.item()
-        if not overall_frequency_weighted_f1.isnan()
-        else None
-    )
+    f1 = torch.as_tensor(module_df["f1_score"].to_numpy(dtype=np.float32))
+    return float((firing_weights * f1).sum().item() / total_w)
 
 
 def get_agg_metrics(

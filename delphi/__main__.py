@@ -31,6 +31,65 @@ from delphi.scorers import DetectionScorer, FuzzingScorer, OpenAISimulator
 from delphi.sparse_coders import load_hooks_sparse_coders, load_sparse_coders
 from delphi.utils import assert_type, load_tokenized_data
 
+import re
+from typing import Optional, Dict, List
+
+def build_latent_selection_from_graph(
+    graph_path: Path,
+    allowed_modules: Optional[List[str]] = None,
+    latents_root: Optional[Path] = None,
+    limit_per_module: Optional[int] = None,   # <-- count-based limit
+) -> Dict[str, torch.Tensor]:
+    """
+    Parse a circuit graph JSON and return:
+        { module (e.g., 'layers.11.mlp'): tensor([latent_ids...], dtype=long) }
+
+    Recognizes node_id like: 'intermediate_<run>_<layer>_<latent>'.
+    If `allowed_modules` is provided, keep only those.
+    If `latents_root` is provided, clamp indices to what exists on disk (via firing_counts.pt).
+    If `limit_per_module` is provided, keep at most that many ids per module (by sorted id).
+    """
+    import re, orjson, torch
+    buf: Dict[str, set] = {}
+    data = orjson.loads(graph_path.read_bytes())
+
+    nodes = data.get("nodes", [])
+    pat = re.compile(r"^intermediate_(\d+)_([\d]+)_([\d]+)$")
+
+    for n in nodes:
+        node_id = n.get("node_id") or ""
+        m = pat.match(node_id)
+        if not m:
+            continue
+        layer = int(m.group(2))
+        latent_idx = int(m.group(3))
+        module = f"layers.{layer}.mlp"
+        if allowed_modules is not None and module not in allowed_modules:
+            continue
+        buf.setdefault(module, set()).add(latent_idx)
+
+    out: Dict[str, torch.Tensor] = {}
+    for module, idxs in buf.items():
+        idx_list = sorted(idxs)
+
+        # optionally clamp to available latents on disk
+        if latents_root is not None:
+            per_mod_dir = latents_root / module
+            fc_file = per_mod_dir / "firing_counts.pt"
+            if fc_file.exists():
+                counts = torch.load(fc_file, weights_only=True)
+                max_ok = counts.numel()
+                idx_list = [i for i in idx_list if i < max_ok]
+
+        # limit by COUNT, not by VALUE
+        if limit_per_module is not None:
+            idx_list = idx_list[:limit_per_module]
+
+        if idx_list:
+            out[module] = torch.tensor(idx_list, dtype=torch.long)
+
+    return out
+
 
 def load_artifacts(run_cfg: RunConfig):
     if run_cfg.load_in_8bit:
@@ -118,6 +177,7 @@ async def process_cache(
     hookpoints: list[str],
     tokenizer: PreTrainedTokenizer | PreTrainedTokenizerFast,
     latent_range: Tensor | None,
+    latent_selection: Optional[Dict[str, torch.Tensor]] = None,  # <-- NEW
 ):
     """
     Converts SAE latent activations in on-disk cache in the `latents_path` directory
@@ -125,13 +185,16 @@ async def process_cache(
     scores in the `scores_path` directory.
     """
     explanations_path.mkdir(parents=True, exist_ok=True)
-
-    if latent_range is None:
-        latent_dict = None
+    
+    if latent_selection is not None:
+        # from circuit graph
+        latent_dict = latent_selection
+    elif latent_range is not None:
+        # from --max_latents
+        latent_dict = {hook: latent_range for hook in hookpoints}
     else:
-        latent_dict = {
-            hook: latent_range for hook in hookpoints
-        }  # The latent range to explain
+        # use all available latents for each module
+        latent_dict = None
 
     dataset = LatentDataset(
         raw_dir=latents_path,
@@ -145,7 +208,7 @@ async def process_cache(
     if run_cfg.explainer_provider == "offline":
         llm_client = Offline(
             run_cfg.explainer_model,
-            max_memory=0.9,
+            max_memory=0.7,
             # Explainer models context length - must be able to accommodate the longest
             # set of examples
             max_model_len=run_cfg.explainer_model_max_len,
@@ -373,14 +436,10 @@ def non_redundant_hookpoints(
         print(f"Files found in {results_path}, skipping...")
     return non_redundant_hookpoints
 
-
-async def run(
-    run_cfg: RunConfig,
-):
+async def run(run_cfg: RunConfig, graph_path: Optional[Path] = None):
     base_path = Path.cwd() / "results"
     if run_cfg.name:
         base_path = base_path / run_cfg.name
-
     base_path.mkdir(parents=True, exist_ok=True)
 
     run_cfg.save_json(base_path / "run_config.json", indent=4)
@@ -393,48 +452,84 @@ async def run(
 
     latent_range = torch.arange(run_cfg.max_latents) if run_cfg.max_latents else None
 
+    # --- Parse the graph FIRST so we know which SAEs to load
+    initial_graph_sel: Optional[Dict[str, torch.Tensor]] = None
+    if graph_path is not None:
+        limit = int(run_cfg.max_latents) if run_cfg.max_latents else None
+        initial_graph_sel = build_latent_selection_from_graph(
+            graph_path=graph_path,
+            allowed_modules=(run_cfg.hookpoints or None),
+            latents_root=None,               # clamp later
+            limit_per_module=limit,          # <--- count limit
+        )
+        if initial_graph_sel:
+            run_cfg.hookpoints = (
+                [m for m in run_cfg.hookpoints if m in initial_graph_sel]
+                if run_cfg.hookpoints else sorted(initial_graph_sel.keys())
+            )
+        else:
+            print(f"[graph] No valid latent nodes found in {graph_path}; "
+                  f"continuing with --hookpoints/--max_latents.")
+
+    # Load model + SAEs (now that run_cfg.hookpoints reflects the graph)
     hookpoints, hookpoint_to_sparse_encode, model, transcode = load_artifacts(run_cfg)
     tokenizer = AutoTokenizer.from_pretrained(run_cfg.model, token=run_cfg.hf_token)
 
+    # If graph mentioned modules for which no SAE loaded, drop them with a notice
+    if initial_graph_sel is not None:
+        available = set(hookpoints)
+        missing = [m for m in initial_graph_sel if m not in available]
+        if missing:
+            print(f"[graph] Skipping modules with no SAE: {missing}")
+        initial_graph_sel = {m: t for m, t in initial_graph_sel.items() if m in available}
+        if initial_graph_sel:
+            hookpoints = [m for m in hookpoints if m in initial_graph_sel]
+        else:
+            print("[graph] After filtering to available SAEs, no modules remain.")
+
+    # Populate cache only for target modules
+    encoders_for_targets = {k: v for k, v in hookpoint_to_sparse_encode.items() if k in set(hookpoints)}
     nrh = assert_type(
         dict,
-        non_redundant_hookpoints(
-            hookpoint_to_sparse_encode, latents_path, "cache" in run_cfg.overwrite
-        ),
+        non_redundant_hookpoints(encoders_for_targets, latents_path, "cache" in run_cfg.overwrite),
     )
     if nrh:
-        populate_cache(
-            run_cfg,
-            model,
-            nrh,
-            latents_path,
-            tokenizer,
-            transcode,
-        )
+        populate_cache(run_cfg, model, nrh, latents_path, tokenizer, transcode)
 
+    # Free big objects before scoring
     del model, hookpoint_to_sparse_encode
+
+    # Optional neighbours
     if run_cfg.constructor_cfg.non_activating_source == "neighbours":
         nrh = assert_type(
             list,
-            non_redundant_hookpoints(
-                hookpoints, neighbours_path, "neighbours" in run_cfg.overwrite
-            ),
+            non_redundant_hookpoints(hookpoints, neighbours_path, "neighbours" in run_cfg.overwrite),
         )
         if nrh:
-            create_neighbours(
-                run_cfg,
-                latents_path,
-                neighbours_path,
-                nrh,
-            )
+            create_neighbours(run_cfg, latents_path, neighbours_path, nrh)
     else:
         print("Skipping neighbour creation")
 
+    # Build FINAL graph-based latent selection, now clamped against what exists on disk
+    graph_latent_selection: Optional[Dict[str, torch.Tensor]] = None
+    if graph_path is not None:
+        limit = int(run_cfg.max_latents) if run_cfg.max_latents else None
+        graph_latent_selection = build_latent_selection_from_graph(
+            graph_path=graph_path,
+            allowed_modules=hookpoints,
+            latents_root=latents_path,       # clamp to what's on disk
+            limit_per_module=limit,          # <--- count limit
+        )
+
+        if not graph_latent_selection:
+            print("[graph] No usable latent indices after clamping to cache; "
+                  "falling back to --max_latents/ALL for selected modules.")
+            graph_latent_selection = None  # fall back to latent_range logic
+
+    target_modules = list(graph_latent_selection.keys()) if graph_latent_selection else hookpoints
     nrh = assert_type(
         list,
-        non_redundant_hookpoints(
-            hookpoints, scores_path, "scores" in run_cfg.overwrite
-        ),
+        non_redundant_hookpoints(target_modules, scores_path, "scores" in run_cfg.overwrite),
     )
     if nrh:
         await process_cache(
@@ -444,11 +539,13 @@ async def run(
             scores_path,
             nrh,
             tokenizer,
-            latent_range,
+            latent_range=None if graph_latent_selection is not None else latent_range,
+            latent_selection=graph_latent_selection,
         )
 
     if run_cfg.verbose:
-        log_results(scores_path, visualize_path, run_cfg.hookpoints, run_cfg.scorers)
+        processed_modules = list(graph_latent_selection.keys()) if graph_latent_selection else hookpoints
+        log_results(scores_path, visualize_path, processed_modules, run_cfg.scorers)
 
 
 if __name__ == "__main__":
@@ -464,6 +561,13 @@ if __name__ == "__main__":
 
     parser = ArgumentParser()
     parser.add_arguments(RunConfig, dest="run_cfg")
+    parser.add_argument(
+        "--graph",
+        type=Path,
+        default=None,
+        help="Path to a circuit graph JSON. If set, Delphi will explain only the "
+             "features referenced in the graph. Overrides --max_latents selection.",
+    )
     args = parser.parse_args()
 
-    asyncio.run(run(args.run_cfg))
+    asyncio.run(run(args.run_cfg, graph_path=args.graph))   # ✅
