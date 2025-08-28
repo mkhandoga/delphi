@@ -67,7 +67,9 @@ class Offline(Client):
             max_model_len=max_model_len,
             enforce_eager=enforce_eager,
         )
-        self.sampling_params = SamplingParams(max_tokens=number_tokens_to_generate)
+        self.sampling_params = SamplingParams(
+            max_tokens=number_tokens_to_generate,
+        )
         self.tokenizer = AutoTokenizer.from_pretrained(model)
         self.batch_size = batch_size
         self.statistics = statistics
@@ -95,19 +97,26 @@ class Offline(Client):
                 self.sampling_params.max_tokens = kwarg["max_tokens"]
             if "temperature" in kwarg:
                 self.sampling_params.temperature = kwarg["temperature"]
+            if "stop" in kwarg:
+                # Merge with existing stop tokens
+                existing_stop = self.sampling_params.stop or []
+                new_stop = kwarg["stop"] if isinstance(kwarg["stop"], list) else [kwarg["stop"]]
+                self.sampling_params.stop = list(set(existing_stop + new_stop))
         loop = asyncio.get_running_loop()
         prompts = []
         statistics = []
 
         for batch in batches:
             prompt = self.tokenizer.apply_chat_template(
-                batch, add_generation_prompt=True, tokenize=True
+                batch, add_generation_prompt=True, tokenize=True,
+                enable_thinking=False  # Disable thinking mode for Qwen models
             )
             prompts.append(prompt)
             if self.statistics:
                 non_cached_tokens = len(
                     self.tokenizer.apply_chat_template(
-                        batch[-1:], add_generation_prompt=True, tokenize=True  # type: ignore
+                        batch[-1:], add_generation_prompt=True, tokenize=True,  # type: ignore
+                        enable_thinking=False
                     )
                 )
                 statistics.append(
@@ -147,6 +156,7 @@ class Offline(Client):
                 )
             )
         return new_response
+
 
     async def generate(
         self, prompt: Union[str, list[dict[str, str]]], **kwargs

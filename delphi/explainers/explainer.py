@@ -63,13 +63,46 @@ class Explainer(ABC):
 
     def parse_explanation(self, text: str) -> str:
         try:
-            match = re.search(r"\[EXPLANATION\]:\s*(.*)", text, re.DOTALL)
+            # Strategy 1: Look for [EXPLANATION]: format (original and preferred)
+            match = re.search(r"\[EXPLANATION\]:\s*(.*?)(?:\n|$)", text, re.DOTALL)
             if match:
-                return match.group(1).strip()
-            else:
-                return "Explanation could not be parsed."
+                explanation = match.group(1).strip()
+                # Make sure it's not just a fragment
+                if len(explanation) > 10 and not explanation.endswith(('...', ',')):
+                    return explanation
+            
+            # Strategy 2: Look for [EXPLANATION] without colon (single line)
+            match = re.search(r"\[EXPLANATION\]\s*(.*?)(?:\n|$)", text)
+            if match:
+                explanation = match.group(1).strip()
+                if len(explanation) > 10 and not explanation.endswith(('...', ',')):
+                    return explanation
+            
+            # Strategy 3: Look for clean final lines that end with period and don't contain reasoning words
+            lines = [line.strip() for line in text.strip().split('\n') if line.strip()]
+            if lines:
+                # Look for the last line that looks like a complete explanation
+                for line in reversed(lines):
+                    # Skip lines that are clearly reasoning/thinking
+                    if any(keyword in line.lower() for keyword in [
+                        'step', 'think', 'analyze', 'consider', 'let me', 'i notice', 
+                        'i should', 'maybe', 'wait', 'but', 'another angle', 'for example'
+                    ]):
+                        continue
+                    
+                    # Must be substantial, end with period, and be a complete sentence
+                    if (len(line) > 20 and 
+                        line.endswith('.') and 
+                        not line.endswith('...')):
+                        return line
+            
+            # If all strategies fail, log the response for debugging
+            logger.warning(f"Could not parse explanation from response: {text[:200]}...")
+            return "Explanation could not be parsed."
+            
         except Exception as e:
-            logger.error(f"Explanation parsing regex failed: {repr(e)}")
+            logger.error(f"Explanation parsing failed: {repr(e)}")
+            logger.error(f"Raw response text: {text[:500]}...")
             raise
 
     def _highlight(self, str_toks: list[str], activations: list[float]) -> str:
