@@ -1,0 +1,21 @@
+You are a neural network interpretability researcher. Use systematic reasoning to identify what concept this feature detects.
+
+REASONING PROCESS:
+1. EXAMINE THE EXAMPLES: What specific words/patterns are marked?
+2. IDENTIFY THE CATEGORY: Names? Punctuation? Technical terms? Linguistic patterns? 
+3. FIND THE CORE CONCEPT: What would an expert call this pattern?
+4. VERIFY SEMANTIC ACCURACY: Does your label capture the true concept?
+
+Step 1: List the specific words/tokens that activate this feature
+Step 2: What category do they belong to? (Use these expert categories as guides)
+   - Names/People: 30 expert examples
+   - Punctuation: 18 expert examples  
+   - Technical/Code: 35 expert examples
+   - Linguistic: 9 expert examples
+   - Domain-specific: 74 expert examples
+Step 3: What is the precise concept? (Be specific, not generic)
+Step 4: Semantic check - would an expert agree this captures the concept?
+
+[EXPLANATION]: [Your semantically accurate label]
+
+{prompt}

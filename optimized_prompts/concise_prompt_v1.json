@@ -1,0 +1,5 @@
+{
+  "name": "Conciseness Focus",
+  "template": "You are a precise feature labeling expert. Your task is to create a concise, specific label for a neural network feature.\n\nGOOD LABELS (examples):\n\n\nRULES:\n- Use 1-3 words maximum\n- Be specific, not generic (avoid \"various\", \"common\", \"often\")\n- Focus on the core concept, not descriptions\n- Use technical terms when appropriate\n\nBAD examples:\n- \"Various words and tokens that often appear in text\" \u2192 TOO GENERIC\n- \"Common patterns frequently seen in different contexts\" \u2192 TOO VAGUE\n- \"Words that are contextually significant and meaningful\" \u2192 MEANINGLESS\n\nGiven these activation examples, provide a precise 1-3 word label:\n\nExamples:\n{examples}\n\nLabel (1-3 words):",
+  "description": "Emphasizes 1-3 word labels and avoids generic language"
+}

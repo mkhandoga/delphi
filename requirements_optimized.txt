@@ -1,0 +1,16 @@
+# Additional requirements for OptimizedDetectionScorer
+
+# Core optimization libraries
+dspy-ai>=2.4.0
+sentence-transformers>=2.2.0
+scikit-learn>=1.3.0
+
+# Optional but recommended for better performance
+transformers>=4.30.0
+torch>=2.0.0
+
+# For active learning and uncertainty quantification
+scipy>=1.10.0
+
+# For better logging and monitoring
+wandb  # optional, for experiment tracking

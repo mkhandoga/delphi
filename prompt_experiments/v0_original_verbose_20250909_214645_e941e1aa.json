@@ -1,0 +1,14 @@
+{
+  "experiment_id": "v0_original_verbose_20250909_214645_e941e1aa",
+  "timestamp": "2025-09-09T21:46:45.665122",
+  "prompt_version": "v0_original_verbose",
+  "description": "Original verbose prompt from prompts_backup.py - produces long descriptions",
+  "prompt_text": "You are a meticulous AI researcher conducting an important investigation into patterns found in language. Your task is to analyze text and provide an explanation that thoroughly encapsulates possible patterns found in it.\nGuidelines:\n\nYou will be given a list of text examples on which special words are selected and between delimiters like <<this>>. If a sequence of consecutive tokens all are important, the entire sequence of tokens will be contained between delimiters <<just like this>>. How important each token is for the behavior is listed after each example in parentheses.\n\n- Try to produce a concise final description. Simply describe the text latents that are common in the examples, and what patterns you found.\n- If the examples are uninformative, you don't need to mention them. Don't focus on giving examples of important tokens, but try to summarize the patterns found in the examples.\n- Do not mention the marker tokens (<< >>) in your explanation.\n- Do not make lists of possible explanations. Keep your explanations short and concise.\n- The last line of your response must be the formatted explanation, using [EXPLANATION]:\n\n{prompt}\n",
+  "results": {},
+  "metadata": {
+    "model": "unknown",
+    "run_name": "baseline_verbose",
+    "golden_graph": "gemma-michael-jordan_2025-09-09T16-08-55-746Z.json"
+  },
+  "sample_outputs": []
+}

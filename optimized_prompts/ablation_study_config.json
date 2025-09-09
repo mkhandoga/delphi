@@ -1,0 +1,46 @@
+{
+  "experiment_name": "label_quality_improvement",
+  "baseline_prompt": "current_explainer_prompt",
+  "test_conditions": [
+    {
+      "name": "conciseness_constraints",
+      "prompt": "optimized_v1",
+      "expected_improvements": [
+        "reduced_verbosity",
+        "shorter_labels"
+      ]
+    },
+    {
+      "name": "chain_of_thought",
+      "prompt": "optimized_v2",
+      "expected_improvements": [
+        "better_reasoning",
+        "more_accurate_concepts"
+      ]
+    },
+    {
+      "name": "contrastive_learning",
+      "prompt": "optimized_v3",
+      "expected_improvements": [
+        "fewer_generic_terms",
+        "clearer_distinctions"
+      ]
+    },
+    {
+      "name": "self_evaluation",
+      "prompt": "optimized_v4",
+      "expected_improvements": [
+        "higher_self_awareness",
+        "quality_control"
+      ]
+    }
+  ],
+  "evaluation_metrics": [
+    "word_count_ratio",
+    "semantic_similarity",
+    "generic_term_frequency",
+    "llm_judge_rating"
+  ],
+  "sample_size_per_condition": 50,
+  "significance_threshold": 0.05
+}

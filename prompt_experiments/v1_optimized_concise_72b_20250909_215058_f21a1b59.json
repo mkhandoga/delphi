@@ -1,0 +1,58 @@
+{
+  "experiment_id": "v1_optimized_concise_72b_20250909_215058_f21a1b59",
+  "timestamp": "2025-09-09T21:50:58.634650",
+  "prompt_version": "v1_optimized_concise_72b",
+  "description": "Same v1 optimized prompt but run on 72B model - comparison to see model size impact",
+  "prompt_text": "Same as v1_optimized_concise",
+  "results": {
+    "avg_semantic_similarity": 0.14140487800466256,
+    "avg_word_count_ratio": 25.745238095238093,
+    "avg_length_score": 0.054503042581212496,
+    "features_evaluated": 70,
+    "best_semantic_similarity": 0.5198032498359682,
+    "worst_semantic_similarity": -0.0276948541402816
+  },
+  "metadata": {
+    "model": "72b",
+    "run_name": "quantized_72b_run",
+    "golden_graph": "gemma-michael-jordan_2025-09-09T16-08-55-746Z.json",
+    "explainer_model": "Qwen/Qwen2.5-72B-Instruct-AWQ",
+    "base_model": "google/gemma-2-2b"
+  },
+  "sample_outputs": {
+    "best_matches": [
+      {
+        "golden_label": "Names",
+        "autogen_label": "\"Proper names and specific words, often parts of names or surnames.\"",
+        "semantic_similarity": 0.5198032498359682
+      },
+      {
+        "golden_label": "action verbs",
+        "autogen_label": "\"Verbs and nouns that describe actions or states, often in the context of processes, communications, or descriptions of objects and concepts.\"",
+        "semantic_similarity": 0.510244096517563
+      },
+      {
+        "golden_label": "names",
+        "autogen_label": "\"Proper names, including surnames and titles, and specific words like \\\"Passion\\\" and \\\"cough\\\".\"",
+        "semantic_similarity": 0.4752181124687195
+      }
+    ],
+    "worst_matches": [
+      {
+        "golden_label": "alone",
+        "autogen_label": "\"The text contains a variety of tokens that are often used to mark the end of a clause or sentence, such as semicolons and periods. Additionally, there are nouns and adjectives that are significant in the context of the text, often related to specific concepts or entities.\"",
+        "semantic_similarity": -0.0276948541402816
+      },
+      {
+        "golden_label": "pack",
+        "autogen_label": "\"Nouns and adjectives that are specific to the context, often referring to objects, people, or concepts with distinct roles or characteristics.\"",
+        "semantic_similarity": -0.0195952244102954
+      },
+      {
+        "golden_label": "deserve",
+        "autogen_label": "\"The conjunction \\\"but\\\" used to introduce a contrast or exception to a statement or idea.\"",
+        "semantic_similarity": -0.0161343421787023
+      }
+    ]
+  }
+}

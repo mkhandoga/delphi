@@ -99,17 +99,18 @@ def load_artifacts(run_cfg: RunConfig):
     else:
         dtype = "auto"
 
-    model = AutoModel.from_pretrained(
-        run_cfg.model,
-        device_map={"": "cuda"},
-        quantization_config=(
-            BitsAndBytesConfig(load_in_8bit=run_cfg.load_in_8bit)
-            if run_cfg.load_in_8bit
-            else None
-        ),
-        torch_dtype=dtype,
-        token=run_cfg.hf_token,
-    )
+    # Don't override quantization_config for pre-quantized models
+    model_kwargs = {
+        "device_map": "auto",  # Let it distribute across available GPUs
+        "torch_dtype": dtype,
+        "token": run_cfg.hf_token,
+    }
+    
+    # Only add quantization_config if explicitly using 8-bit
+    if run_cfg.load_in_8bit:
+        model_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
+    
+    model = AutoModel.from_pretrained(run_cfg.model, **model_kwargs)
 
     hookpoint_to_sparse_encode, transcode = load_hooks_sparse_coders(
         model,

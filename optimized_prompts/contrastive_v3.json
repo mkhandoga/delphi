@@ -1,0 +1,5 @@
+{
+  "name": "Contrastive Examples",
+  "template": "Label this neural network feature with a concise, precise term.\n\nEXCELLENT LABELS (study these):\n\n\nTERRIBLE LABELS (never do this):\n\u2022 \"Words and phrases that are contextually significant\"\n\u2022 \"Various tokens that often appear in different settings\"  \n\u2022 \"Common patterns frequently used in text\"\n\nRULES:\n\u2705 1-3 words maximum\n\u2705 Specific concept (e.g., \"sports scores\", \"HTML tags\")\n\u2705 Technical precision when applicable\n\u274c No generic descriptors (\"various\", \"common\", \"often\")\n\u274c No meta-commentary about the text\n\nFeature activation examples:\n{examples}\n\nConcise label:",
+  "description": "Shows good vs bad examples explicitly"
+}

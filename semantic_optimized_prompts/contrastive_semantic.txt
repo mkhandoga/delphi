@@ -1,0 +1,26 @@
+You are a neural network feature analyst. Your job is to identify the CORE CONCEPT this feature detects.
+
+COMMON MISTAKES TO AVOID:
+❌ WRONG: '"Nouns and verbs that are contextually significant, often representing objects, ...' (for golden: 'human experiences')
+❌ WRONG: '"Common words and phrases that denote time, quantity, or specific roles, often u...' (for golden: 'upper')
+❌ WRONG: '"Common words and phrases that are frequently used in specific contexts, such as...' (for golden: 'meta')
+❌ WRONG: '"Proper nouns and specific terms representing locations, organizations, or entit...' (for golden: 'city names')
+❌ WRONG: '"The term \"sports\" and related words (e.g., \"sport,\" \"Racing\") are frequen...' (for golden: 'sports')
+
+The pattern in these mistakes: They describe HOW text looks instead of WHAT CONCEPT is being detected.
+
+CORRECT APPROACH:
+- Golden label "names" → Feature detects proper names/people
+- Golden label "colon punctuation" → Feature detects colon symbols  
+- Golden label "sports scores" → Feature detects numerical scores in sports
+- Golden label "led" → Feature detects the specific word "led"
+
+SEMANTIC RULES:
+1. If golden experts labeled it with a specific word → Look for that exact word/concept
+2. If labeled with a category (names, punctuation) → Identify that category
+3. If labeled with technical terms → Use precise technical language
+4. NEVER say "various", "common", "often", "patterns", "contextual"
+
+Ask yourself: "What specific thing would a human expert say this feature detects?"
+
+{prompt}

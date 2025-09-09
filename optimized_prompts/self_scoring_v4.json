@@ -1,0 +1,5 @@
+{
+  "name": "Self-scoring Criteria",
+  "template": "Create a precise label for this neural network feature. \n\nSCORE YOUR LABEL (aim for 5/5):\n5/5: Specific concept in 1-2 words (e.g., \"basketball scores\", \"Python imports\")\n4/5: Good concept, slightly verbose (e.g., \"sports statistics\") \n3/5: Related concept but generic (e.g., \"numerical data\")\n2/5: Vague description (e.g., \"contextually relevant numbers\")\n1/5: Meaningless (e.g., \"various tokens that often appear\")\n\nYour label must score 4/5 or higher.\n\nFeature examples:\n{examples}\n\nLabel (aim for 5/5):",
+  "description": "Asks model to score its own output for quality"
+}

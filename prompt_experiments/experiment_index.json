@@ -1,0 +1,25 @@
+{
+  "experiments": [
+    {
+      "experiment_id": "v1_optimized_concise_72b_20250909_215058_f21a1b59",
+      "timestamp": "2025-09-09T21:50:58.634650",
+      "prompt_version": "v1_optimized_concise_72b",
+      "description": "Same v1 optimized prompt but run on 72B model - comparison to see model size impact",
+      "file": "v1_optimized_concise_72b_20250909_215058_f21a1b59.json"
+    },
+    {
+      "experiment_id": "v1_optimized_concise_20250909_214659_5558746b",
+      "timestamp": "2025-09-09T21:46:59.022343",
+      "prompt_version": "v1_optimized_concise",
+      "description": "Optimized prompt with 3-word max, concept focus, explicit bad example warnings",
+      "file": "v1_optimized_concise_20250909_214659_5558746b.json"
+    },
+    {
+      "experiment_id": "v0_original_verbose_20250909_214645_e941e1aa",
+      "timestamp": "2025-09-09T21:46:45.665122",
+      "prompt_version": "v0_original_verbose",
+      "description": "Original verbose prompt from prompts_backup.py - produces long descriptions",
+      "file": "v0_original_verbose_20250909_214645_e941e1aa.json"
+    }
+  ]
+}

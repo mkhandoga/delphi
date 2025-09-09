@@ -1,0 +1,5 @@
+{
+  "name": "Chain-of-thought Reasoning",
+  "template": "You are a neural network interpretability expert. Label this feature with precision.\n\nHIGH-QUALITY LABELS:\n\n\nPROCESS:\n1. First, identify the specific pattern in the examples\n2. Then, create a 1-3 word label for this pattern\n\nCONSTRAINTS:\n- Maximum 3 words\n- Avoid generic terms (various, common, often, specific, different)\n- Focus on the precise concept, not meta-descriptions\n\nExamples where this feature activates:\n{examples}\n\nStep 1 - Pattern I see: [describe the specific pattern in 1 sentence]\nStep 2 - Precise label: [1-3 words]",
+  "description": "Two-step process: identify pattern, then label"
+}

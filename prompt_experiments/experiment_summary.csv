@@ -1,0 +1,4 @@
+experiment_id,timestamp,prompt_version,description,avg_semantic_similarity,avg_word_count_ratio,avg_length_score,features_evaluated,model,run_name
+v1_optimized_concise_72b_20250909_215058_f21a1b59,2025-09-09T21:50:58.634650,v1_optimized_concise_72b,Same v1 optimized prompt but run on 72B model - comparison to see model size impact,0.14140487800466256,25.745238095238093,0.054503042581212496,70.0,72b,quantized_72b_run
+v1_optimized_concise_20250909_214659_5558746b,2025-09-09T21:46:59.022343,v1_optimized_concise,"Optimized prompt with 3-word max, concept focus, explicit bad example warnings",0.13897886723101233,26.473809523809525,0.05318112963004258,70.0,unknown,quantized_32b_run
+v0_original_verbose_20250909_214645_e941e1aa,2025-09-09T21:46:45.665122,v0_original_verbose,Original verbose prompt from prompts_backup.py - produces long descriptions,,,,,unknown,baseline_verbose

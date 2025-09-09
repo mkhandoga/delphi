@@ -1,0 +1,58 @@
+{
+  "experiment_id": "v1_optimized_concise_20250909_214659_5558746b",
+  "timestamp": "2025-09-09T21:46:59.022343",
+  "prompt_version": "v1_optimized_concise",
+  "description": "Optimized prompt with 3-word max, concept focus, explicit bad example warnings",
+  "prompt_text": "You are a precise neural network feature labeling expert. Your task is to create a concise, specific label for what this feature detects.\n\nExamples of EXCELLENT labels (study these):\n- \"facts\" (not \"statements presenting factual information\")\n- \"names\" (not \"proper nouns and entities in text\") \n- \"colon punctuation\" (not \"punctuation marks that introduce lists\")\n- \"sports scores\" (not \"numerical data in sports contexts\")\n- \"code syntax\" (not \"programming language elements\")\n- \"city names\" (not \"geographical location entities\")\n\nCRITICAL RULES:\n- Maximum 3 words\n- Be specific, not generic (avoid \"various\", \"common\", \"often\", \"specific\", \"different\") \n- Focus on the exact concept, not descriptions\n- Use technical terms when appropriate\n\nBAD examples (never do this):\n- \"Various words and tokens that often appear in text\"\n- \"Common patterns frequently seen in contexts\" \n- \"Words that are contextually significant\"\n- \"Text elements with particular characteristics\"\n\nYou will be given text examples with important tokens marked between <<delimiters>>. \n\nYour response MUST end with: [EXPLANATION]: [your 1-3 word label]\n\nGuidelines:\n- Simply describe what concept the marked tokens represent\n- Keep explanations SHORT and concise\n- Do not make lists of possible explanations\n- Do not mention the delimiter tokens (<< >>)\n\n{prompt}",
+  "results": {
+    "avg_semantic_similarity": 0.13897886723101233,
+    "avg_word_count_ratio": 26.473809523809525,
+    "avg_length_score": 0.05318112963004258,
+    "features_evaluated": 70,
+    "best_semantic_similarity": 0.510244096517563,
+    "worst_semantic_similarity": -0.032214056700468
+  },
+  "metadata": {
+    "model": "unknown",
+    "run_name": "quantized_32b_run",
+    "golden_graph": "gemma-michael-jordan_2025-09-09T16-08-55-746Z.json",
+    "explainer_model": "Qwen/Qwen2.5-72B-Instruct-AWQ",
+    "base_model": "google/gemma-2-2b"
+  },
+  "sample_outputs": {
+    "best_matches": [
+      {
+        "golden_label": "action verbs",
+        "autogen_label": "\"Verbs and nouns that describe actions or states, often in the context of processes, communications, or descriptions of objects and concepts.\"",
+        "semantic_similarity": 0.510244096517563
+      },
+      {
+        "golden_label": "city names",
+        "autogen_label": "\"Proper nouns and specific terms representing locations, organizations, or entities, often with cultural, historical, or specific significance.\"",
+        "semantic_similarity": 0.4380948466062546
+      },
+      {
+        "golden_label": "names",
+        "autogen_label": "\"Proper nouns, including names and places, and specific terms or concepts that are significant in the context of the text.\"",
+        "semantic_similarity": 0.4244260601202647
+      }
+    ],
+    "worst_matches": [
+      {
+        "golden_label": "deserve",
+        "autogen_label": "\"Common conjunctions and prepositions used to introduce contrasting or additional information, and nouns representing locations or actions.\"",
+        "semantic_similarity": -0.032214056700468
+      },
+      {
+        "golden_label": "alone",
+        "autogen_label": "\"The text contains a variety of tokens that are often used to mark the end of a clause or sentence, such as semicolons and periods. Additionally, there are nouns and adjectives that are significant in the context of the text, often related to specific concepts or entities.\"",
+        "semantic_similarity": -0.0276948541402816
+      },
+      {
+        "golden_label": "pack",
+        "autogen_label": "\"Nouns and adjectives that are specific to the context, often referring to objects, people, or concepts with distinct roles or characteristics.\"",
+        "semantic_similarity": -0.0195952244102954
+      }
+    ]
+  }
+}
